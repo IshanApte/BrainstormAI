@@ -1,0 +1,30 @@
+{
+  "name": "brainstormai",
+  "version": "1.0.0",
+  "description": "AI-powered brainstorming assistant with automatic note-taking",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd backend && npm run dev",
+    "client": "cd frontend && npm start",
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && npm start"
+  },
+  "keywords": [
+    "ai",
+    "brainstorming",
+    "notes",
+    "langchain",
+    "react"
+  ],
+  "author": "BrainstormAI Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "@langchain/langgraph": "^0.2.74",
+    "jspdf": "^3.0.1"
+  }
+}
