@@ -34,26 +34,26 @@ class MultiAgentService {
   async generateResponse(userMessage, conversationHistory = []) {
     console.log("MultiAgentService: Delegating to LangGraph orchestrator.");
     try {
-      const agentResponse = await runGraph(userMessage, conversationHistory);
+      const graphResult = await runGraph(userMessage, conversationHistory);
+      const allAgentResponses = graphResult.allResponses || [];
+      const firstResponse = graphResult.firstResponse;
 
-      if (!agentResponse || !agentResponse.content) {
-        console.error("LangGraph did not return a valid agent response. Falling back.");
+      if (!firstResponse || !firstResponse.content || allAgentResponses.length === 0) {
+        console.error("LangGraph did not return any valid agent responses. Falling back.");
         // Fallback to a simple direct Storm call if graph fails catastrophically
-        // This is a safety net and ideally shouldn't be hit if graph error handling is robust.
         const storm = new StormAgent();
         const fallbackResponse = await storm.generateResponse(userMessage, conversationHistory);
         return {
-          isMultiAgent: true, // Or false, depending on how you want to represent this fallback
+          isMultiAgent: false,
           agents: [fallbackResponse],
           response: fallbackResponse.content
         };
       }
       
-      // The runGraph now returns the full response object of the last speaking agent
       return {
-        isMultiAgent: true, // true because multiple agents are managed by the graph
-        agents: [agentResponse], // The graph ensures only one agent "speaks" per turn to the user
-        response: agentResponse.content
+        isMultiAgent: allAgentResponses.length > 1,
+        agents: allAgentResponses, // All agent responses for group chat display
+        response: firstResponse.content // Primary response for backward compatibility
       };
 
     } catch (error) {
@@ -61,7 +61,7 @@ class MultiAgentService {
       // Critical fallback if runGraph itself throws an unhandled error
       try {
         console.log("Critical fallback: Directly using StormAgent due to graph error.");
-        const storm = new StormAgent(); // Instantiate storm directly
+        const storm = new StormAgent();
         const stormResponse = await storm.generateResponse(userMessage, conversationHistory);
         return {
           isMultiAgent: false,
@@ -120,55 +120,67 @@ class MultiAgentService {
       
       const whoWasHere = uniqueAgentNames.length > 0 ? `You + ${uniqueAgentNames.join(', ')}` : 'You + The AI Team';
 
-      const notePrompt = `Based on the following brainstorming conversation with multiple AI agents, create friendly and casual session notes in bullet-point format. Keep it organized but relaxed in tone.
+      const notePrompt = `Based on the following brainstorming conversation with multiple AI agents, extract and organize the content into THREE separate sections. Return ONLY a JSON object with three keys: "keyIdeas", "decisions", and "nextSteps". Each should be an array of bullet-point strings.
 
-**💭 Brainstorm Session Notes**
-• Date: ${currentDate}
-• Who was here: ${whoWasHere}
-• What we did: Creative brainstorming session
+Format your response as valid JSON only, no markdown, no additional text:
 
-**🎯 What we talked about:**
-• [Main topics and ideas we explored]
+{
+  "keyIdeas": ["idea 1", "idea 2", ...],
+  "decisions": ["decision 1", "decision 2", ...],
+  "nextSteps": ["step 1", "step 2", ...]
+}
 
-**💡 Cool ideas we came up with:**
-• [Fun and creative concepts discussed]
-• [Interesting solutions and approaches]
-• [Wild ideas that came up]
+Guidelines:
+- **Key Ideas**: Capture the main concepts, creative thoughts, interesting solutions, and breakthrough insights discussed
+- **Decisions**: Include any choices made, directions agreed upon, or conclusions reached
+- **Next Steps**: List actionable items, tasks to explore, things to research, or follow-up activities
 
-**🤔 What the team thought (if different voices were clear):**
-• [Key contributions or perspectives from different agents, if discernible]
-
-**✅ Things we decided:**
-• [Any choices or directions we settled on]
-• [Stuff we agreed on]
-
-**📝 Things to do next:**
-• [Fun tasks to try out]
-• [Next steps to explore]
-• [Things to research or look into]
-
-**❓ Questions we're still wondering about:**
-• [Stuff we want to figure out later]
-• [Things that need more thinking]
-
-**🌟 Best bits from today:**
-• [Coolest insights and breakthroughs]
-• [Most exciting discoveries]
-• [Key things to remember]
-
-Extract the relevant info from our conversation below and organize it into this casual, friendly bullet-point format. Keep it fun and approachable while still being helpful! If specific agent names are not clear in the transcript, refer to them generally as 'the AI team' or similar.
+Keep each item concise but meaningful. If a category has no relevant content, return an empty array for that category.
 
 Conversation:
 ${conversationText}
 
-Session Notes:`;
+JSON Response:`;
 
       const response = await this.noteGenerationModel.call([
-        new SystemMessage('You are a friendly note-taker who creates casual, approachable session notes from brainstorming conversations. Use a warm, informal tone that works for both professional and personal projects like birthday parties, weekend activities, or creative endeavors.'),
+        new SystemMessage('You are a structured note-taker who extracts key information from brainstorming conversations and organizes it into three categories: Key Ideas, Decisions, and Next Steps. Always return valid JSON only.'),
         new HumanMessage(notePrompt)
       ]);
 
-      return response.content;
+      // Parse the JSON response
+      let parsedNotes;
+      try {
+        // Try to extract JSON from the response (in case it's wrapped in markdown or has extra text)
+        const jsonMatch = response.content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsedNotes = JSON.parse(jsonMatch[0]);
+        } else {
+          parsedNotes = JSON.parse(response.content);
+        }
+      } catch (parseError) {
+        console.error('Error parsing notes JSON:', parseError);
+        console.error('Response content:', response.content);
+        // Fallback: create empty structure
+        parsedNotes = {
+          keyIdeas: [],
+          decisions: [],
+          nextSteps: []
+        };
+      }
+
+      // Convert arrays to formatted markdown strings
+      const formatNotes = (items) => {
+        if (!items || items.length === 0) {
+          return '*No items yet*';
+        }
+        return items.map(item => `• ${item}`).join('\n');
+      };
+
+      return {
+        keyIdeas: formatNotes(parsedNotes.keyIdeas),
+        decisions: formatNotes(parsedNotes.decisions),
+        nextSteps: formatNotes(parsedNotes.nextSteps)
+      };
     } catch (error) {
       console.error('Error generating notes:', error);
       throw new Error('Failed to generate notes');

@@ -63,24 +63,44 @@ router.post('/', async (req, res) => {
 
     if (session.messages.length >= 4) {
       try {
-        const noteContent = await multiAgentService.generateNotes(session.messages);
+        const categorizedNotes = await multiAgentService.generateNotes(session.messages);
         
-        // Check if notes already exist for this session
-        let existingNote = await Note.findOne({ sessionId: session.sessionId });
+        // Create or update notes for each category
+        const categories = [
+          { name: 'Key Ideas', content: categorizedNotes.keyIdeas },
+          { name: 'Decisions', content: categorizedNotes.decisions },
+          { name: 'Next Steps', content: categorizedNotes.nextSteps }
+        ];
+
+        const createdNotes = [];
         
-        if (existingNote) {
-          existingNote.content = noteContent;
-          await existingNote.save();
-          notes = existingNote;
-        } else {
-          const newNote = new Note({
-            sessionId: session.sessionId,
-            content: noteContent,
-            category: session.category || 'General'
+        for (const { name, content } of categories) {
+          // Check if a note for this category already exists
+          let existingNote = await Note.findOne({ 
+            sessionId: session.sessionId, 
+            category: name 
           });
-          await newNote.save();
-          notes = newNote;
+          
+          if (existingNote) {
+            existingNote.content = content;
+            existingNote.isEdited = false; // Reset since it's auto-generated
+            await existingNote.save();
+            createdNotes.push(existingNote);
+          } else {
+            const newNote = new Note({
+              sessionId: session.sessionId,
+              content: content,
+              category: name
+            });
+            await newNote.save();
+            createdNotes.push(newNote);
+          }
         }
+
+        // Notes are now created as separate entries per category
+        // Return a simple message to trigger frontend refresh
+        // Frontend will load notes via /api/notes/:sessionId
+        notes = 'Notes updated';
       } catch (noteError) {
         console.error('Error generating notes:', noteError);
       }
@@ -92,7 +112,7 @@ router.post('/', async (req, res) => {
       agents: multiAgentResponse.agents,
       isMultiAgent: multiAgentResponse.isMultiAgent,
       messageIndex: session.messages.length - 1,
-      notes: notes ? notes.content : null,
+      notes: notes || null, // Return truthy value to indicate notes were updated
       isNewSession
     });
 

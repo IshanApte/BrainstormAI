@@ -17,19 +17,21 @@ const graphState = {
     value: (x, y) => y,
     default: () => "",
   },
-  // Stores the name of the single agent node selected by the supervisor to respond
-  selectedAgentNodeName: {
+  // Stores the names of agents selected by the supervisor to respond (can be multiple)
+  selectedAgentNodeNames: {
     value: (x, y) => y,
-    default: () => null,
+    default: () => [],
   },
-  // Stores the full response object from the selected agent
+  // Stores responses from all participating agents
+  agentResponses: {
+    value: (x, y) => x.concat(y),
+    default: () => [],
+  },
+  // Stores the final output (array of agent responses)
   finalOutput: {
     value: (x, y) => y,
-    default: () => null,
+    default: () => [],
   },
-  // Optional: could store who spoke on the *previous* turn from user, if passed in
-  // For this simplified single-response graph, it's less directly used by the graph itself.
-  // lastAgentWhoRespondedToUser: { value: (x,y) => y, default: () => null }
 };
 
 // Instantiate agents once
@@ -40,57 +42,55 @@ const agents = {
   devilsAdvocate: new DevilsAdvocateAgent(),
 };
 
-// --- Generic Agent Node ---
-// This node will run *after* the supervisor has selected it.
-// It generates a response and prepares the graph to end.
+// --- Agent Runner Node ---
+// Runs all selected agents in parallel
 async function agentRunnerNode(state) {
-  const agentName = state.selectedAgentNodeName.replace("_agent", ""); // e.g., "storm_agent" -> "storm"
-  const agentInstance = agents[agentName];
-  
-  if (!agentInstance) {
-    console.error(`Supervisor selected agent '${agentName}', but instance not found.`);
-    return { 
-      finalOutput: { name: 'ErrorAgent', emoji: '⚠️', content: "System error: Agent not found.", conversationStage: 'error' },
-      messages: state.messages.concat(new AIMessage({content: "System error: Agent not found.", name: "Error"}))
-    };
-  }
-  
-  console.log(`--- Running Selected Agent Node: ${agentName} ---`);
   const currentUserMessage = state.input;
   const recentHistory = state.messages.slice(-MAX_MESSAGES_FOR_LLM);
-  console.log(`${agentName} Node: Using history of length ${recentHistory.length} for LLM.`);
+  
+  console.log(`--- Running ${state.selectedAgentNodeNames.length} agents in parallel ---`);
+  
+  // Run all agents in parallel
+  const agentPromises = state.selectedAgentNodeNames.map(async (agentNodeName) => {
+    const agentName = agentNodeName.replace("_agent", ""); // e.g., "storm_agent" -> "storm"
+    const agentInstance = agents[agentName];
+    
+    if (!agentInstance) {
+      console.error(`Supervisor selected agent '${agentName}', but instance not found.`);
+      return { name: 'ErrorAgent', emoji: '⚠️', content: "System error: Agent not found.", conversationStage: 'error' };
+    }
+    
+    console.log(`--- Running Agent: ${agentName} ---`);
+    console.log(`${agentName} Node: Using history of length ${recentHistory.length} for LLM.`);
 
-  try {
-    const agentResponse = await agentInstance.generateResponse(currentUserMessage, recentHistory);
-    console.log(`${agentName} Response Object:`, agentResponse);
-
-    // The new message to add to history is the current user input + this agent's response
-    // However, for the graph state, messages should reflect the history *before* this turn's AI response.
-    // The service layer will add the AI response to the persistent history.
-    // For `finalOutput`, we return what this agent generated.
-    return {
-      finalOutput: agentResponse,
-      // messages: state.messages.concat(new AIMessage({ content: agentResponse.content, name: agentName })) 
-      // Let service calling runGraph handle appending the *final* chosen AI message to history to avoid duplicates if re-invoked.
-    };
-  } catch (error) {
-    console.error(`Error in ${agentName} Node:`, error);
-    return { 
-      finalOutput: { name: 'ErrorAgent', emoji: '⚠️', content: `An error occurred with ${agentName}.`, conversationStage: 'error' },
-      // messages: state.messages.concat(new AIMessage({content: `Error with ${agentName}.`, name: "Error"}))
-    };
-  }
+    try {
+      const agentResponse = await agentInstance.generateResponse(currentUserMessage, recentHistory);
+      console.log(`${agentName} Response Object:`, agentResponse);
+      return agentResponse;
+    } catch (error) {
+      console.error(`Error in ${agentName} Node:`, error);
+      return { name: 'ErrorAgent', emoji: '⚠️', content: `An error occurred with ${agentName}.`, conversationStage: 'error' };
+    }
+  });
+  
+  // Wait for all agents to complete
+  const agentResponses = await Promise.all(agentPromises);
+  
+  console.log(`--- All ${agentResponses.length} agents completed ---`);
+  
+  return {
+    agentResponses: agentResponses,
+    finalOutput: agentResponses
+  };
 }
 
 // --- Supervisor Node ---
-// Goal: Select ONE agent to respond to the current state.input, then direct to that agent.
+// Goal: Select 1-3 agents to respond in parallel for a group chat feel
 async function supervisorNode(state) {
-  console.log("--- Running Supervisor Node (to select one agent) ---");
+  console.log("--- Running Supervisor Node (to select multiple agents) ---");
   const currentUserMessage = state.input;
   const conversationHistoryForChecks = state.messages.slice(-MAX_MESSAGES_FOR_LLM);
-  // const lastUserTurnSpeaker = state.lastAgentWhoRespondedToUser; // Example of how it might be used
 
-  let selectedAgentKey = null;
   const potentialAgents = [];
 
   console.log(`Supervisor: Full history length: ${state.messages.length}, Using ${conversationHistoryForChecks.length} for checks.`);
@@ -104,24 +104,41 @@ async function supervisorNode(state) {
   }
   console.log("Supervisor: All agents who *could* participate:", potentialAgents);
 
+  let selectedAgents = [];
+  
   if (potentialAgents.length > 0) {
-    // Prioritize non-Storm agents if available, then Storm, or random if multiple non-Storm
+    // For group chat feel: select 1-3 agents
+    // Always include Storm if they want to participate (they're the host)
+    // Then add 1-2 other agents for variety
+    
     const nonStormParticipants = potentialAgents.filter(name => name !== 'storm');
-    if (nonStormParticipants.length > 0) {
-      selectedAgentKey = nonStormParticipants[Math.floor(Math.random() * nonStormParticipants.length)];
-    } else if (potentialAgents.includes('storm')) {
-      selectedAgentKey = 'storm';
+    
+    // Always include Storm if available (they're the primary facilitator)
+    if (potentialAgents.includes('storm')) {
+      selectedAgents.push('storm');
     }
+    
+    // Add 1-2 other agents for group discussion
+    if (nonStormParticipants.length > 0) {
+      // Shuffle and take up to 2 additional agents
+      const shuffled = nonStormParticipants.sort(() => Math.random() - 0.5);
+      const additionalCount = Math.min(2, shuffled.length);
+      selectedAgents.push(...shuffled.slice(0, additionalCount));
+    }
+    
+    // Limit to max 3 agents to avoid overwhelming
+    selectedAgents = selectedAgents.slice(0, 3);
   } else {
-     // Absolute fallback to Storm if no one wants to participate
+    // Absolute fallback to Storm if no one wants to participate
     console.log("Supervisor: No agent wants to participate based on their logic, defaulting to Storm.");
-    selectedAgentKey = 'storm';
+    selectedAgents = ['storm'];
   }
   
-  console.log(`Supervisor: Final Selected Agent for this turn - ${selectedAgentKey}`);
+  const selectedAgentNodeNames = selectedAgents.map(name => `${name}_agent`);
+  console.log(`Supervisor: Selected Agents for this turn (${selectedAgents.length}):`, selectedAgents);
+  
   return { 
-    selectedAgentNodeName: `${selectedAgentKey}_agent`
-    // messages and input are passed through from initial state for the selected agent
+    selectedAgentNodeNames: selectedAgentNodeNames
   };
 }
 
@@ -130,17 +147,17 @@ const workflow = new StateGraph({ channels: graphState });
 
 // Add nodes
 workflow.addNode("supervisor", supervisorNode);
-// A single node that runs the selected agent
-workflow.addNode("selected_agent_runner", agentRunnerNode);
+// Agent runner node that processes agents sequentially (but they run in parallel conceptually)
+workflow.addNode("agent_runner", agentRunnerNode);
 
 // 4. Define the edges
 workflow.addEdge(START, "supervisor");
 
-// After supervisor selects an agent, go to the agent runner node
-workflow.addEdge("supervisor", "selected_agent_runner");
+// After supervisor selects agents, go to the agent runner node
+workflow.addEdge("supervisor", "agent_runner");
 
-// After the selected agent runs, the graph ends.
-workflow.addEdge("selected_agent_runner", END);
+// After all agents run in parallel, the graph ends
+workflow.addEdge("agent_runner", END);
 
 // 5. Compile the graph
 const app = workflow.compile();
@@ -150,14 +167,23 @@ async function runGraph(inputText, currentHistory = []) {
   const initialState = {
     messages: currentHistory, // Full history for context
     input: inputText,         // Current user message
-    // lastAgentWhoRespondedToUser: currentHistory.length > 0 ? currentHistory[currentHistory.length -1].name : null, // Example
+    selectedAgentNodeNames: [],
+    agentResponses: [],
+    finalOutput: []
   };
-  console.log("Graph Initial State (for single response):", initialState);
+  console.log("Graph Initial State (for multi-agent response):", initialState);
   const finalState = await app.invoke(initialState);
-  console.log("--- Graph Execution Complete (for single response) ---");
+  console.log("--- Graph Execution Complete (for multi-agent response) ---");
   console.log("Graph Final State:", finalState);
-  console.log("Final Output (from selected agent):", finalState.finalOutput);
-  return finalState.finalOutput;
+  console.log("Final Output (from selected agents):", finalState.finalOutput);
+  
+  // Return object with both first response and all responses
+  const responses = finalState.finalOutput || [];
+  
+  return {
+    firstResponse: responses.length > 0 ? responses[0] : null,
+    allResponses: responses
+  };
 }
 
 /*
