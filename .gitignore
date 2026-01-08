@@ -72,6 +72,8 @@ dist
 # Gatsby files
 .cache/
 public
+# Exception: frontend/public is needed for Create React App
+!frontend/public/
 
 # Storybook build outputs
 .out
