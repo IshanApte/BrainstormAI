@@ -285,4 +285,10 @@ For issues and questions:
 
 ---
 
+## Attributions
+
+- **Icons**: Idea icons created by [Good Ware](https://www.flaticon.com/authors/good-ware) - [Flaticon](https://www.flaticon.com/free-icons/idea)
+
+---
+
 **Happy Brainstorming! 🚀** 

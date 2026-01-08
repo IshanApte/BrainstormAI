@@ -146,21 +146,6 @@ function AppContent() {
           </div>
         </div>
       </div>
-
-      {/* Footer with Attribution */}
-      <footer className="flex-shrink-0 bg-white border-t border-gray-200 px-6 py-2">
-        <div className="text-xs text-gray-500 text-center">
-          <a 
-            href="https://www.flaticon.com/free-icons/idea" 
-            title="idea icons"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-gray-700 underline"
-          >
-            Idea icons created by Good Ware - Flaticon
-          </a>
-        </div>
-      </footer>
     </div>
   );
 }
