@@ -1,0 +1,297 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Send, ThumbsUp, ThumbsDown, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { chatApi, feedbackApi } from '../services/api';
+import { Message, ChatResponse, Feedback, AgentResponse } from '../types';
+
+interface ChatInterfaceProps {
+  sessionId: string | null;
+  onSessionCreated: (sessionId: string) => void;
+  messages: Message[];
+  onMessagesUpdate: (messages: Message[]) => void;
+}
+
+const ChatInterface: React.FC<ChatInterfaceProps> = ({
+  sessionId,
+  onSessionCreated,
+  messages,
+  onMessagesUpdate,
+}) => {
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [feedback, setFeedback] = useState<Record<number, Feedback>>({});
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Welcome message showing both agents
+  const welcomeMessages: AgentResponse[] = [
+    {
+      name: 'Storm',
+      emoji: '🌪️',
+      content: `Hi! I'm **Storm**, your AI brainstorming companion!
+
+I'm here to help you explore ideas, think creatively, and turn your thoughts into actionable insights. I love wild ideas, creative thinking, and building excitement around possibilities!
+
+**🎯 For the best results:**
+- **Be specific** - Instead of "I need ideas for my business," try "I'm starting a sustainable food delivery service for busy professionals"
+- **Share context** - Tell me about your goals, constraints, or what you've already tried
+- **Think out loud** - Share half-formed thoughts, concerns, or wild ideas - I love working with messy thinking!
+
+**💡 I can help you:**
+- Explore different angles and perspectives
+- Generate creative alternatives
+- Build excitement around your ideas
+- Ask follow-up questions to spark new thinking
+
+Ready to brainstorm? What's on your mind today?`
+    },
+    {
+      name: 'Sage',
+      emoji: '🧙‍♂️',
+      content: `Hello! I'm **Sage**, and I'll join the conversation when we need some critical thinking and practical analysis.
+
+While Storm helps you explore creative possibilities, I focus on:
+
+**🔍 Critical Analysis:**
+- Evaluating feasibility and practical challenges
+- Asking tough questions: "What could go wrong?"
+- Considering implementation details
+- Identifying potential risks and obstacles
+
+**🎯 My Approach:**
+- Constructive skepticism (not negativity!)
+- Evidence-based reasoning
+- Risk assessment and mitigation
+- Turning creative ideas into actionable plans
+
+Don't worry - I won't crush your creativity! I'll help make your ideas stronger and more realistic. Looking forward to our thoughtful discussions!`
+    }
+  ];
+
+  const welcomeMessage: Message = {
+    role: 'assistant',
+    content: 'Welcome to BrainstormAI!', // Fallback content
+    agents: welcomeMessages,
+    timestamp: new Date(),
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  useEffect(() => {
+    if (sessionId) {
+      loadFeedback();
+    }
+  }, [sessionId]);
+
+  const loadFeedback = async () => {
+    if (!sessionId) return;
+    
+    try {
+      const feedbackData = await feedbackApi.getFeedback(sessionId);
+      const feedbackMap = feedbackData.reduce((acc, fb) => {
+        acc[fb.messageIndex] = fb;
+        return acc;
+      }, {} as Record<number, Feedback>);
+      setFeedback(feedbackMap);
+    } catch (error) {
+      console.error('Error loading feedback:', error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || isLoading) return;
+
+    const userMessage = inputMessage.trim();
+    setInputMessage('');
+    setIsLoading(true);
+
+    // Add user message to local state immediately
+    const newUserMessage: Message = {
+      role: 'user',
+      content: userMessage,
+      timestamp: new Date(),
+    };
+
+    const updatedMessages = [...messages, newUserMessage];
+    onMessagesUpdate(updatedMessages);
+
+    try {
+      const response: ChatResponse = await chatApi.sendMessage(userMessage, sessionId || undefined);
+      
+      // If this is a new session, update the session ID
+      if (response.isNewSession) {
+        onSessionCreated(response.sessionId);
+      }
+
+      // Add AI response to messages (handling both single and multi-agent responses)
+      const aiMessage: Message = {
+        role: 'assistant',
+        content: response.response,
+        agents: response.agents,
+        timestamp: new Date(),
+      };
+
+      onMessagesUpdate([...updatedMessages, aiMessage]);
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Remove the user message if the request failed
+      onMessagesUpdate(messages);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleFeedback = async (messageIndex: number, rating: 'thumbs_up' | 'thumbs_down') => {
+    if (!sessionId) return;
+
+    try {
+      const feedbackResponse = await feedbackApi.submitFeedback(sessionId, messageIndex, rating);
+      setFeedback(prev => ({
+        ...prev,
+        [messageIndex]: feedbackResponse,
+      }));
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+    }
+  };
+
+  const renderAgentResponse = (agent: AgentResponse) => (
+    <div key={agent.name} className="mb-4 last:mb-0">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-lg">{agent.emoji}</span>
+        <span className="font-semibold text-sm text-gray-700">{agent.name}</span>
+      </div>
+      <div className="prose prose-sm max-w-none">
+        <ReactMarkdown>{agent.content}</ReactMarkdown>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 ? (
+          // Show both agents' welcome messages
+          <div className="flex justify-start">
+            <div className="max-w-3xl message-assistant">
+              {welcomeMessage.agents?.map(agent => renderAgentResponse(agent))}
+            </div>
+          </div>
+        ) : (
+          messages.map((message, index) => (
+            <div
+              key={index}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-3xl ${
+                  message.role === 'user' ? 'message-user' : 'message-assistant'
+                }`}
+              >
+                {message.role === 'user' ? (
+                  <div className="prose prose-sm max-w-none">
+                    <p className="mb-0">{message.content}</p>
+                  </div>
+                ) : (
+                  <div>
+                    {message.agents && message.agents.length > 0 ? (
+                      // Multi-agent response
+                      message.agents.map(agent => renderAgentResponse(agent))
+                    ) : (
+                      // Single agent response (backward compatibility)
+                      <div className="prose prose-sm max-w-none">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Feedback buttons for AI messages */}
+                {message.role === 'assistant' && sessionId && (
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
+                    <span className="text-xs text-gray-500">Was this helpful?</span>
+                    <button
+                      onClick={() => handleFeedback(index, 'thumbs_up')}
+                      className={`feedback-button ${
+                        feedback[index]?.rating === 'thumbs_up' ? 'active' : ''
+                      }`}
+                      title="Thumbs up"
+                    >
+                      <ThumbsUp size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleFeedback(index, 'thumbs_down')}
+                      className={`feedback-button ${
+                        feedback[index]?.rating === 'thumbs_down' ? 'active' : ''
+                      }`}
+                      title="Thumbs down"
+                    >
+                      <ThumbsDown size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+        
+        {/* Loading indicator */}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="message-assistant">
+              <div className="flex items-center gap-2">
+                <Loader2 className="animate-spin" size={16} />
+                <span className="text-gray-500">Thinking...</span>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Area */}
+      <div className="border-t border-gray-200 p-4 bg-white">
+        <div className="flex gap-3">
+          <textarea
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Share your idea or ask a question..."
+            className="input-field resize-none"
+            rows={3}
+            disabled={isLoading}
+          />
+          <button
+            onClick={handleSendMessage}
+            disabled={!inputMessage.trim() || isLoading}
+            className="btn-primary self-end flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Send size={16} />
+            Send
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          Press Enter to send, Shift+Enter for new line
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default ChatInterface; 
