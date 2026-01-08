@@ -227,6 +227,65 @@ BrainstormAI/
 - `npm run build` - Build for production
 - `npm test` - Run tests
 
+## Deployment
+
+### Frontend Deployment (Vercel)
+
+1. **Connect your GitHub repository to Vercel**
+   - Go to [Vercel](https://vercel.com) and import your repository
+   - Set the **Root Directory** to `frontend`
+   - Framework Preset: **Create React App**
+
+2. **Configure Environment Variables in Vercel**
+   - Go to your project settings → Environment Variables
+   - Add: `REACT_APP_API_URL` = `https://your-backend-url.com/api`
+   - Replace `your-backend-url.com` with your deployed backend URL
+
+3. **Deploy**
+   - Vercel will automatically deploy on every push to main
+   - Or manually trigger a deployment from the Vercel dashboard
+
+### Backend Deployment
+
+The backend needs to be deployed separately. Recommended platforms:
+
+#### Option 1: Railway (Recommended)
+1. Go to [Railway](https://railway.app)
+2. Create a new project from GitHub
+3. Select the `backend` folder as the root directory
+4. Add environment variables:
+   - `PORT` (Railway will auto-assign, but you can set it)
+   - `MONGODB_URI` (your MongoDB connection string)
+   - `OPENAI_API_KEY` (your OpenAI API key)
+   - `NODE_ENV=production`
+   - `CORS_ORIGIN` (your Vercel frontend URL, e.g., `https://your-app.vercel.app`)
+5. Deploy and copy the generated URL
+6. Update `REACT_APP_API_URL` in Vercel with this URL + `/api`
+
+#### Option 2: Render
+1. Go to [Render](https://render.com)
+2. Create a new Web Service
+3. Connect your GitHub repository
+4. Set root directory to `backend`
+5. Build command: `npm install`
+6. Start command: `npm start`
+7. Add the same environment variables as above
+8. Deploy and update Vercel's `REACT_APP_API_URL`
+
+#### Option 3: Heroku
+1. Create a new Heroku app
+2. Set the buildpack to Node.js
+3. Set root directory to `backend` in `package.json` or use a Procfile
+4. Add environment variables via Heroku dashboard
+5. Deploy and update Vercel's `REACT_APP_API_URL`
+
+### Important Notes
+
+- **CORS Configuration**: Make sure `CORS_ORIGIN` in your backend `.env` includes your Vercel frontend URL
+- **Environment Variables**: Never commit `.env` files. Use your hosting platform's environment variable settings
+- **MongoDB**: Use MongoDB Atlas for production (free tier available)
+- **API URL**: After deploying the backend, update `REACT_APP_API_URL` in Vercel to point to your backend API
+
 ## Troubleshooting
 
 ### Common Issues

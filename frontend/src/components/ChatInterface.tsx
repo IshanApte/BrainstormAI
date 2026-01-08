@@ -98,11 +98,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         onNotesGenerated(response.notes);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
       // Remove the user message if the request failed
       onMessagesUpdate(messages);
-      alert('Failed to send message. Please try again.');
+      const errorMessage = error?.response?.status === 404 || error?.code === 'ERR_NETWORK'
+        ? 'Backend API not found. Please ensure the backend is deployed and REACT_APP_API_URL is configured correctly.'
+        : error?.response?.data?.error || error?.message || 'Failed to send message. Please try again.';
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }
