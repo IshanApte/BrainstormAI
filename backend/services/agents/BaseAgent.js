@@ -60,7 +60,9 @@ IMPORTANT: Adapt your response length and depth to match this conversation stage
     : stageInfo.stage === 'mid' 
     ? 'Provide moderate detail as context builds. You can expand on ideas but stay focused.' 
     : 'Now you can give comprehensive, detailed responses with full analysis and multiple perspectives.'
-}`;
+}
+
+CRITICAL: When responding, NEVER prefix your message with your name or any other agent's name (like "Storm:", "Sage:", etc.). Your name will be displayed automatically by the system. Start your response directly with your actual message content.`;
 
     return `${basePrompt}${stageGuidance}`;
   }
@@ -93,10 +95,16 @@ IMPORTANT: Adapt your response length and depth to match this conversation stage
       ];
 
       const response = await this.model.call(messages);
+      
+      // Strip out any accidental agent name prefixes (Storm:, Sage:, Visionary:, Devil's Advocate:, etc.)
+      let cleanedContent = response.content;
+      const agentNamePrefixPattern = /^(Storm|Sage|Visionary|Devil'?s?\s*Advocate):\s*/i;
+      cleanedContent = cleanedContent.replace(agentNamePrefixPattern, '');
+      
       return {
         name: this.name,
         emoji: this.emoji,
-        content: response.content,
+        content: cleanedContent,
         conversationStage: stageInfo.stage // Include stage info in response
       };
     } catch (error) {

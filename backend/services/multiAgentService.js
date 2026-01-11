@@ -173,7 +173,19 @@ JSON Response:`;
         if (!items || items.length === 0) {
           return '*No items yet*';
         }
-        return items.map(item => `• ${item}`).join('\n');
+        // Clean up items that might already have bullet points
+        const cleanedItems = items.flatMap(item => {
+          // If an item contains bullet points (• or *), split it
+          if (item.includes('•')) {
+            return item.split('•').map(s => s.trim()).filter(s => s.length > 0);
+          } else if (item.includes('*') && !item.startsWith('*No items')) {
+            return item.split('*').map(s => s.trim()).filter(s => s.length > 0);
+          }
+          return [item.trim()];
+        });
+        
+        // Format as proper markdown list with each item on its own line
+        return cleanedItems.map(item => `- ${item}`).join('\n\n');
       };
 
       return {
