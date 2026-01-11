@@ -166,7 +166,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <span className="font-semibold text-sm text-gray-900">{agent.name}</span>
         </div>
         {/* Message content */}
-        <div className="prose prose-sm max-w-none text-sm text-gray-800">
+        <div className="prose prose-sm max-w-none text-sm text-gray-600">
           <ReactMarkdown>{cleanContent}</ReactMarkdown>
         </div>
       </div>
@@ -202,7 +202,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   </div>
                   <h3 className="text-sm font-bold text-gray-900">Storm</h3>
                 </div>
-                <p className="text-xs text-gray-700 leading-relaxed">
+                <p className="text-xs text-gray-500 leading-relaxed">
                   Enthusiastic and creative, encourages wild ideas and asks thoughtful questions to explore different angles.
                 </p>
               </div>
@@ -214,7 +214,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   </div>
                   <h3 className="text-sm font-bold text-gray-900">Sage</h3>
                 </div>
-                <p className="text-xs text-gray-700 leading-relaxed">
+                <p className="text-xs text-gray-500 leading-relaxed">
                   Wise and analytical, asks critical questions about feasibility and helps turn ideas into actionable plans.
                 </p>
               </div>
@@ -226,7 +226,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   </div>
                   <h3 className="text-sm font-bold text-gray-900">Devil's Advocate</h3>
                 </div>
-                <p className="text-xs text-gray-700 leading-relaxed">
+                <p className="text-xs text-gray-500 leading-relaxed">
                   Constructively challenges ideas, identifies risks and blind spots to make concepts stronger and more robust.
                 </p>
               </div>
@@ -238,7 +238,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   </div>
                   <h3 className="text-sm font-bold text-gray-900">Visionary</h3>
                 </div>
-                <p className="text-xs text-gray-700 leading-relaxed">
+                <p className="text-xs text-gray-500 leading-relaxed">
                   Ambitious and forward-thinking, encourages big-picture ideas and focuses on long term potential.
                 </p>
               </div>
@@ -257,7 +257,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               <>
                 {/* User message bubble */}
                 <div className="max-w-2xl bg-[#e6f4ea] rounded-2xl px-4 py-3">
-                  <div className="prose prose-sm max-w-none text-sm text-gray-900">
+                  <div className="prose prose-sm max-w-none text-sm text-gray-600">
                     <p className="mb-0">{message.content}</p>
                   </div>
                 </div>
@@ -275,7 +275,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   ) : (
                     // Single agent response (backward compatibility)
                     <div className="p-3 bg-gray-50 rounded-lg">
-                      <div className="prose prose-sm max-w-none text-sm text-gray-800">
+                      <div className="prose prose-sm max-w-none text-sm text-gray-600">
                         <ReactMarkdown>{message.content}</ReactMarkdown>
                       </div>
                     </div>
@@ -310,7 +310,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               <button
                 key={index}
                 onClick={() => handleStarterClick(prompt)}
-                className="text-left p-3 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all text-xs text-gray-600 leading-relaxed animate-fade-in-up"
+                className="text-left p-3 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all text-xs text-gray-500 leading-relaxed animate-fade-in-up"
                 style={{ animationDelay: `${400 + index * 100}ms` }}
                 disabled={isLoading || isTransitioning}
               >
@@ -342,10 +342,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <button
             onClick={() => handleSendMessage()}
             disabled={!inputMessage.trim() || isLoading}
-            className="flex items-center gap-2 bg-transparent border-none outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 text-sm font-semibold text-gray-900"
+            className="group flex items-center gap-2 bg-transparent border-none outline-none cursor-pointer disabled:cursor-not-allowed text-sm font-semibold text-gray-900 transition-all duration-300 opacity-100 disabled:opacity-40 hover:scale-105 hover:gap-2.5 disabled:hover:scale-100 disabled:hover:gap-2"
           >
-            <Sparkles size={16} className="text-[#056A0B]" />
-            <span>Ask</span>
+            <Sparkles 
+              size={16} 
+              className="text-[#056A0B] transition-all duration-300 group-hover:brightness-110 group-hover:scale-110 disabled:group-hover:brightness-100 disabled:group-hover:scale-100"
+            />
+            <span className="transition-all duration-300">Ask</span>
           </button>
         </div>
       </div>
