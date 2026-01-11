@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, Smile, Laugh, Angry, Sparkles, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { chatApi } from '../services/api';
 import { Message, ChatResponse, AgentResponse } from '../types';
@@ -125,7 +125,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const getAgentColor = (agentName: string) => {
     const colors: { [key: string]: { border: string; bg: string; text: string } } = {
       'Storm': { border: 'border-blue-400', bg: 'bg-blue-50', text: 'text-blue-700' },
-      'Sage': { border: 'border-purple-400', bg: 'bg-purple-50', text: 'text-purple-700' },
+      'Sage': { border: 'border-green-400', bg: 'bg-green-50', text: 'text-green-700' },
       'Devil\'s Advocate': { border: 'border-red-400', bg: 'bg-red-50', text: 'text-red-700' },
       'Visionary': { border: 'border-yellow-400', bg: 'bg-yellow-50', text: 'text-yellow-700' },
     };
@@ -163,47 +163,60 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         {/* Welcome strip - only shown for first-time users */}
         {messages.length === 0 && (
           <>
-            <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 mb-4">
-              <p className="text-xs text-gray-500 text-center">
-                Brainstorm with 4 perspectives and capture Key Ideas, Decisions, and Next Steps in Notes
-              </p>
+            {/* Title - prominent at the top */}
+            <div className="mb-6">
+              <h1 className="text-xl font-bold text-gray-900">
+                Brainstorm with 4 advisors and capture Key Ideas, Decisions, and Next Steps in Notes
+              </h1>
             </div>
             {/* Personality Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               {/* Storm */}
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <h3 className="text-sm font-semibold text-gray-900">Storm</h3>
+              <div className="p-4 bg-white border border-blue-300/75 rounded-2xl animate-fade-in-up" style={{ animationDelay: '0ms' }}>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <Laugh className="text-blue-600" size={24} />
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-900">Storm</h3>
                 </div>
-                <p className="text-xs text-gray-600 leading-relaxed">
+                <p className="text-xs text-gray-700 leading-relaxed">
                   Enthusiastic and creative, encourages wild ideas and asks thoughtful questions to explore different angles.
                 </p>
               </div>
               {/* Sage */}
-              <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <h3 className="text-sm font-semibold text-gray-900">Sage</h3>
+              <div className="p-4 bg-white border border-green-300/75 rounded-2xl animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                    <Smile className="text-green-600" size={24} />
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-900">Sage</h3>
                 </div>
-                <p className="text-xs text-gray-600 leading-relaxed">
+                <p className="text-xs text-gray-700 leading-relaxed">
                   Wise and analytical, asks critical questions about feasibility and helps turn ideas into actionable plans.
                 </p>
               </div>
               {/* Devil's Advocate */}
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <h3 className="text-sm font-semibold text-gray-900">Devil's Advocate</h3>
+              <div className="p-4 bg-white border border-red-300/75 rounded-2xl animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                    <Angry className="text-red-600" size={24} />
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-900">Devil's Advocate</h3>
                 </div>
-                <p className="text-xs text-gray-600 leading-relaxed">
+                <p className="text-xs text-gray-700 leading-relaxed">
                   Constructively challenges ideas, identifies risks and blind spots to make concepts stronger and more robust.
                 </p>
               </div>
               {/* Visionary */}
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <h3 className="text-sm font-semibold text-gray-900">Visionary</h3>
+              <div className="p-4 bg-white border border-yellow-300/75 rounded-2xl animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                    <Sparkles className="text-yellow-600" size={24} />
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-900">Visionary</h3>
                 </div>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  Ambitious and forward-thinking, encourages big-picture ideas and focuses on long-term potential and impact.
+                <p className="text-xs text-gray-700 leading-relaxed">
+                  Ambitious and forward-thinking, encourages big-picture ideas and focuses on long term potential.
                 </p>
               </div>
             </div>
@@ -268,7 +281,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               <button
                 key={index}
                 onClick={() => handleStarterClick(prompt)}
-                className="text-left p-3 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all text-xs text-gray-600 leading-relaxed"
+                className="text-left p-3 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all text-xs text-gray-600 leading-relaxed animate-fade-in-up"
+                style={{ animationDelay: `${400 + index * 100}ms` }}
                 disabled={isLoading}
               >
                 {prompt}
@@ -281,7 +295,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Share your idea or ask a question..."
+            placeholder="Share your idea or ask a question....."
             className="input-field resize-none text-sm placeholder:text-xs placeholder:text-gray-400"
             rows={3}
             disabled={isLoading}
@@ -289,10 +303,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <button
             onClick={() => handleSendMessage()}
             disabled={!inputMessage.trim() || isLoading}
-            className="btn-primary self-end flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            className="self-end flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
-            <Send size={16} />
-            Send
+            <Plus size={16} />
+            Ask
           </button>
         </div>
       </div>
