@@ -21,6 +21,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 }) => {
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const starterPrompts = [
@@ -119,7 +121,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const handleStarterClick = (prompt: string) => {
-    handleSendMessage(prompt);
+    // Start transition animation
+    setIsTransitioning(true);
+    // Wait for fade-out animation to complete before sending message
+    setTimeout(() => {
+      handleSendMessage(prompt);
+      setIsTransitioning(false);
+    }, 300); // Match the fade-out duration
   };
 
   const getAgentColor = (agentName: string) => {
@@ -132,6 +140,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     return colors[agentName] || { border: 'border-gray-400', bg: 'bg-gray-50', text: 'text-gray-700' };
   };
 
+  const getAgentIcon = (agentName: string, fallbackEmoji?: string) => {
+    const iconMap: { [key: string]: React.ReactNode } = {
+      'Storm': <Laugh className="text-blue-600" size={20} />,
+      'Sage': <Smile className="text-green-600" size={20} />,
+      'Devil\'s Advocate': <Angry className="text-red-600" size={20} />,
+      'Visionary': <Sparkles className="text-yellow-600" size={20} />,
+    };
+    return iconMap[agentName] || (fallbackEmoji ? <span className="text-base">{fallbackEmoji}</span> : null);
+  };
+
   const renderAgentResponse = (agent: AgentResponse, index: number) => {
     // Strip agent name prefix from content if present (e.g., "Storm:" or "Storm: ")
     let cleanContent = agent.content;
@@ -140,13 +158,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       cleanContent = cleanContent.replace(namePrefix, '').trim();
     }
     
-    const colors = getAgentColor(agent.name);
-    
     return (
-      <div key={`${agent.name}-${index}`} className={`mb-2 p-3 rounded-lg ${colors.bg} border-l-4 ${colors.border} shadow-sm`}>
-        {/* Agent label with color */}
-        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border ${colors.border} ${colors.bg} ${colors.text} text-xs font-semibold mb-2`}>
-          <span>{agent.name}</span>
+      <div key={`${agent.name}-${index}`} className="mb-2 p-3 bg-gray-50 rounded-lg">
+        {/* Agent name with icon */}
+        <div className="flex items-center gap-2 mb-2">
+          {getAgentIcon(agent.name, agent.emoji)}
+          <span className="font-semibold text-sm text-gray-900">{agent.name}</span>
         </div>
         {/* Message content */}
         <div className="prose prose-sm max-w-none text-sm text-gray-800">
@@ -156,13 +173,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     );
   };
 
+  // Get user initial for avatar
+  const getUserInitial = () => {
+    // Default to 'Y' if we don't have user info - in a real app you'd get this from user context
+    return 'Y';
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Welcome strip - only shown for first-time users */}
-        {messages.length === 0 && (
-          <>
+        {(messages.length === 0 || isTransitioning) && (
+          <div className={`transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
             {/* Title - prominent at the top */}
             <div className="mb-6">
               <h1 className="text-xl font-bold text-gray-900">
@@ -220,47 +243,53 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 </p>
               </div>
             </div>
-          </>
+          </div>
         )}
 
         {/* Messages */}
         {messages.map((message, index) => (
           <div
             key={index}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}
+            style={{ animationDelay: `${index * 50}ms` }}
           >
-            <div
-              className={`max-w-2xl ${
-                message.role === 'user' ? 'message-user' : ''
-              }`}
-            >
-              {message.role === 'user' ? (
-                <div className="prose prose-sm max-w-none text-sm text-gray-700">
-                  <p className="mb-0">{message.content}</p>
+            {message.role === 'user' ? (
+              <>
+                {/* User message bubble */}
+                <div className="max-w-2xl bg-[#e6f4ea] rounded-2xl px-4 py-3">
+                  <div className="prose prose-sm max-w-none text-sm text-gray-900">
+                    <p className="mb-0">{message.content}</p>
+                  </div>
                 </div>
-              ) : (
-                <div className="space-y-2">
+                {/* User avatar */}
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
+                  <span className="text-white text-sm font-medium">{getUserInitial()}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="max-w-2xl space-y-2">
                   {message.agents && message.agents.length > 0 ? (
                     // Display all agent responses for group chat feel
                     message.agents.map((agent, idx) => renderAgentResponse(agent, idx))
                   ) : (
                     // Single agent response (backward compatibility)
-                    <div className="message-assistant">
-                      <div className="prose prose-sm max-w-none text-sm text-gray-700">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="prose prose-sm max-w-none text-sm text-gray-800">
                         <ReactMarkdown>{message.content}</ReactMarkdown>
                       </div>
                     </div>
                   )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         ))}
         
         {/* Loading indicator */}
         {isLoading && (
-          <div className="flex justify-start">
-            <div className="message-assistant max-w-2xl">
+          <div className="flex justify-start items-start gap-3">
+            <div className="max-w-2xl p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-2">
                 <Loader2 className="animate-spin" size={16} />
                 <span className="text-xs text-gray-500">Thinking...</span>
@@ -275,38 +304,48 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {/* Input Area */}
       <div className="border-t border-gray-200 p-4 bg-white">
         {/* Starter Cards - shown when no messages */}
-        {messages.length === 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        {(messages.length === 0 || isTransitioning) && (
+          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
             {starterPrompts.map((prompt, index) => (
               <button
                 key={index}
                 onClick={() => handleStarterClick(prompt)}
                 className="text-left p-3 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all text-xs text-gray-600 leading-relaxed animate-fade-in-up"
                 style={{ animationDelay: `${400 + index * 100}ms` }}
-                disabled={isLoading}
+                disabled={isLoading || isTransitioning}
               >
                 {prompt}
               </button>
             ))}
           </div>
         )}
-        <div className="flex gap-3">
-          <textarea
+        <div 
+          className="flex items-center gap-3 bg-white rounded-lg px-4 py-6 shadow-lg border-2 transition-all duration-200"
+          style={{
+            borderColor: isInputFocused ? '#056a0b' : 'transparent',
+            boxShadow: isInputFocused 
+              ? '0 0 0 4px rgba(5, 106, 11, 0.1), 0 0 20px rgba(5, 106, 11, 0.2)' 
+              : '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+          }}
+        >
+          <input
+            type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={handleKeyPress}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => setIsInputFocused(false)}
             placeholder="Share your idea or ask a question....."
-            className="input-field resize-none text-sm placeholder:text-xs placeholder:text-gray-400"
-            rows={3}
+            className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-[#9ca3af] text-gray-900"
             disabled={isLoading}
           />
           <button
             onClick={() => handleSendMessage()}
             disabled={!inputMessage.trim() || isLoading}
-            className="self-end flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            className="flex items-center gap-2 bg-transparent border-none outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 text-sm font-semibold text-gray-900"
           >
-            <Plus size={16} />
-            Ask
+            <Sparkles size={16} className="text-[#056A0B]" />
+            <span>Ask</span>
           </button>
         </div>
       </div>
